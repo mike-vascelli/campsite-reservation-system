@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 public class AvailabilityServiceImpl implements AvailabilityService {
     private ReservedDayRepository reservedDayRepository;
 
+    @Override
     public List<LocalDate> computeAvailableDays(LocalDate rangeStart, LocalDate rangeEnd) {
         // TODO add cache logic
         Set<LocalDate> reservedDays = reservedDayRepository.findAllByDayGreaterThanEqualAndDayLessThan(

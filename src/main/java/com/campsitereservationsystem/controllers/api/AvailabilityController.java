@@ -13,43 +13,60 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Tag(name = "Availability", description = "Campsite Availability APIs")
 @RestController
 public class AvailabilityController {
-    private static final int DEFAULT_RANGE_START_DAY_INCREMENT = 1;
-    private static final int DEFAULT_RANGE_END_DAY_INCREMENT = 30;
+    private static final int MAX_AVAILABILITY_DAYS_RANGE = 30;
 
     @Autowired
     private AvailabilityService availabilityService;
-
-    private static LocalDate parseDay(String date, int default_day_increment) {
-        try {
-            return Strings.isBlank(date) ? LocalDate.now().plusDays(default_day_increment) : LocalDate.parse(date);
-        } catch (Exception e) {
-            throw new AvailabilityRequestValidationException("Invalid date string. Could not parse into date.", e);
-        }
-    }
 
     @GetMapping("/v1/availability")
     public ResponseEntity<List<LocalDate>> computeAvailability(
             @RequestParam(value = "from", required = false) String from,
             @RequestParam(value = "to", required = false) String to
     ) {
-        LocalDate rangeStart = parseDay(from, DEFAULT_RANGE_START_DAY_INCREMENT);
-        LocalDate rangeEnd = parseDay(to, DEFAULT_RANGE_END_DAY_INCREMENT);
+        LocalDate rangeStart = getRangeStartOrDefault(parseDate(from));
+        LocalDate rangeEnd = getRangeEndOrDefault(parseDate(to), rangeStart);
 
-        if (!rangeStart.isBefore(rangeEnd)) {
+        if (rangeStart.isBefore(tomorrow())) {
+            throw new AvailabilityRequestValidationException("The 'from' date should be no earlier than tomorrow's date");
+        }
+
+        Period range = Period.between(rangeStart, rangeEnd);
+        if (range.isNegative() || range.isZero()) {
             throw new AvailabilityRequestValidationException("The 'from' date should precede the 'to' date");
         }
-        if (Period.between(rangeStart, rangeEnd).getDays() > DEFAULT_RANGE_END_DAY_INCREMENT) {
+        if (range.getDays() > MAX_AVAILABILITY_DAYS_RANGE) {
             throw new AvailabilityRequestValidationException(
-                    "The maximum allowed availability search range is " + DEFAULT_RANGE_END_DAY_INCREMENT + " days"
+                    "The maximum allowed availability search range is " + MAX_AVAILABILITY_DAYS_RANGE + " days"
             );
         }
 
         List<LocalDate> availableDays = availabilityService.computeAvailableDays(rangeStart, rangeEnd);
         return new ResponseEntity<>(availableDays, HttpStatus.OK);
+    }
+
+    private static LocalDate parseDate(String date) {
+        try {
+            return Strings.isBlank(date) ? null : LocalDate.parse(date);
+        } catch (DateTimeParseException e) {
+            throw new AvailabilityRequestValidationException("Invalid date string. Could not parse into date.", e);
+        }
+    }
+
+    private static LocalDate getRangeStartOrDefault(LocalDate rangeStart) {
+        return rangeStart == null ? tomorrow() : rangeStart;
+    }
+
+    private static LocalDate getRangeEndOrDefault(LocalDate rangeEnd, LocalDate rangeStart) {
+        return rangeEnd == null ? rangeStart.plusDays(MAX_AVAILABILITY_DAYS_RANGE) : rangeEnd;
+    }
+
+    private static LocalDate tomorrow() {
+        return LocalDate.now().plusDays(1);
     }
 }
