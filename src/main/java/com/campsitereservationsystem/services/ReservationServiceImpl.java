@@ -23,10 +23,6 @@ public class ReservationServiceImpl implements ReservationService {
     private ReservationRepository reservationRepository;
     private ReservedDayRepository reservedDayRepository;
 
-    private static Set<LocalDate> daysInFirstButNotInSecond(Set<LocalDate> first, Set<LocalDate> second) {
-        return first.stream().filter(d -> !second.contains(d)).collect(Collectors.toUnmodifiableSet());
-    }
-
     @Override
     public Reservation getReservation(UUID reservationId) {
         return reservationRepository.findByIdAndIsCanceledFalse(reservationId)
@@ -79,5 +75,9 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public List<Reservation> getAllReservations() {
         return reservationRepository.findAllByIsCanceledFalse();
+    }
+
+    private static Set<LocalDate> daysInFirstButNotInSecond(Set<LocalDate> first, Set<LocalDate> second) {
+        return first.stream().filter(d -> !second.contains(d)).collect(Collectors.toUnmodifiableSet());
     }
 }
